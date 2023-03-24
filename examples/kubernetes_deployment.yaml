@@ -1,0 +1,97 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: clamav
+  namespace: my-namespace
+spec:
+  selector:
+    matchLabels:
+      app: clamav
+  replicas: 1
+  selector:
+    matchLabels:
+        app: clamav
+  strategy:
+    rollingUpdate:
+      maxSurge: 25%
+      maxUnavailable: 25%
+    type: RollingUpdate
+  template:
+    metadata:
+      labels:
+        app: clamav
+    spec:
+      containers:
+      - image: my-repository/clamav-rootless:latest
+        imagePullPolicy: Always
+        name: container-0
+        env:
+        - name: TINI_SUBREAPER
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities: {}
+          privileged: false
+          readOnlyRootFilesystem: false
+          runAsGroup: 65534
+          runAsUser: 65534
+        volumeMounts:
+        - mountPath: /var/lib/clamav
+          name: share
+          subPath: clamav/lib
+          readOnly: false
+        - mountPath: /var/log/clamav
+          name: share
+          subPath: clamav/log
+          readOnly: false
+        - mountPath: /etc/clamav
+          name: share
+          subPath: clamav/etc
+          readOnly: true
+      imagePullSecrets:
+      - name: my-pullsecret
+      initContainers:
+      - command: ["/bin/sh","-c", "ls -la /share && ([ -d /share/clamav/lib ] || mkdir -p /share/clamav/lib) && ([ -d /share/clamav/log ] || mkdir -p /share/clamav/log) && ([ -d /share/clamav/etc ] || mkdir -p /share/clamav/etc)"]
+        image: alpine:3
+        imagePullPolicy: IfNotPresent
+        name: create-dirs-with-ownership
+        resources: {}
+        terminationMessagePath: /dev/termination-log
+        terminationMessagePolicy: File
+        volumeMounts:
+        - mountPath: /share
+          name: share
+          readOnly: false
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities: {}
+          privileged: false
+          readOnlyRootFilesystem: false
+          runAsGroup: 65534
+          runAsUser: 65534
+      - image: my-repository/clamav-init:latest
+        imagePullPolicy: Always
+        name: clamav-init
+        env:
+        - name: HTTPProxyServer
+          value: "my-proxy"
+        - name: HTTPProxyPort
+          value: "3128"
+        resources: {}
+        terminationMessagePath: /dev/termination-log
+        terminationMessagePolicy: File
+        volumeMounts:
+        - mountPath: /etc/clamav
+          name: share
+          subPath: clamav/etc/clamav
+          readOnly: false
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities: {}
+          privileged: false
+          readOnlyRootFilesystem: false
+          runAsGroup: 65534
+          runAsUser: 65534
+      volumes:
+      - name: share
+        persistentVolumeClaim:
+          claimName: my-pvc

@@ -1,0 +1,12 @@
+FROM clamav/clamav:latest AS clamav
+
+FROM redhat/ubi8:latest
+
+LABEL name="clamav-init" \
+	description="ClamAV Rootless Initcontainer"
+
+COPY --from=clamav "/etc/clamav" "/clamav_config"
+
+COPY docker/start_initcontainer.sh /start.sh
+
+ENTRYPOINT [ "/start.sh" ]

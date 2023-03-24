@@ -1,0 +1,17 @@
+FROM frolvlad/alpine-gcc AS builder
+
+COPY docker/check_logfile_lock.c /
+
+RUN gcc /check_logfile_lock.c -o /check_logfile_lock
+
+FROM clamav/clamav:latest
+
+LABEL name="clamav-rootless" \
+	version="1.0.1" \
+	description="ClamAV Rootless"
+
+COPY --from=builder "/check_logfile_lock" "/check_logfile_lock"
+
+COPY docker/start_main.sh /init
+
+RUN ln -f -s "/run/lock" "/var/lock"
